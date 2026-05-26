@@ -308,7 +308,7 @@ success "Base system configured."
 # Setup username inside Ubuntu
 info "Creating user account..."
 username=$(load_profile "USERNAME")
-username="${username:-nux}"
+username="${username:-nuxdroid}"
 run_logged "Creating user account '${username}'" run_in_ubuntu bash -c "
     if ! id '${username}' &>/dev/null; then
         useradd -m -s /bin/bash '${username}'

@@ -35,7 +35,7 @@ main() {
     gpu_tier=$(load_profile "GPU_TIER")
 
     de_session="${de_session:-startxfce4}"
-    username="${username:-nux}"
+    username="${username:-nuxdroid}"
     gpu_tier="${gpu_tier:-3}"
 
     # 1. Stop any existing session

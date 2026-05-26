@@ -32,27 +32,52 @@ get_driver_short() {
     esac
 }
 
-# Install only the packages that actually exist in the enabled repos.
-# GPU package names vary across Termux mirrors/repos, so we filter to what's
-# available rather than passing a fixed list that aborts the whole command
-# with "Unable to locate package" when one name is missing.
+# Install GPU packages one by one, reporting exactly what happened with each.
+# Package names vary across Termux mirrors/repos, so we check availability with
+# apt-cache first (a missing name in a single `pkg install` would abort the
+# whole command with "Unable to locate package"). Each package is then
+# installed individually so a failure names the precise package, and the user
+# sees which were skipped (not in their repos) vs. which failed to install.
 install_available_pkgs() {
     local label="$1"; shift
-    local available=()
+    info "$label"
+
+    local available=() unavailable=() failed=() installed=()
     local pkg
     for pkg in "$@"; do
         if apt-cache show "$pkg" >/dev/null 2>&1; then
             available+=("$pkg")
+        else
+            unavailable+=("$pkg")
         fi
     done
+
+    # Be transparent about packages that simply aren't in the user's repos.
+    if [[ ${#unavailable[@]} -gt 0 ]]; then
+        warn "Not in your repos, skipped: ${unavailable[*]}"
+    fi
 
     if [[ ${#available[@]} -eq 0 ]]; then
         warn "No GPU packages for this tier are available in your repos — will fall back if needed."
         return 0
     fi
 
-    if ! run_with_spinner "$label" pkg install -y "${available[@]}"; then
-        warn "Some GPU packages failed to install — will fall back if needed. See $NUX_LOG."
+    # Install each available package on its own so failures are pinpointed.
+    for pkg in "${available[@]}"; do
+        { echo ""; echo "\$ pkg install -y $pkg"; } >> "$NUX_LOG"
+        if pkg install -y "$pkg" >> "$NUX_LOG" 2>&1; then
+            success "Installed ${pkg}"
+            installed+=("$pkg")
+        else
+            error "Failed to install ${pkg}"
+            failed+=("$pkg")
+        fi
+    done
+
+    if [[ ${#failed[@]} -gt 0 ]]; then
+        warn "GPU packages that failed: ${failed[*]}"
+        warn "See the log for the exact apt error: $NUX_LOG"
+        warn "Nux will fall back to a lower GPU tier at runtime if needed."
     fi
 }
 

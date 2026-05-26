@@ -10,7 +10,7 @@ setup_username() {
 
     local username
     while true; do
-        username=$(prompt_text "Username" "nux")
+        username=$(prompt_text "Username" "nuxdroid")
         # Validate: lowercase, no spaces, no special chars, 1-32 chars
         if [[ "$username" =~ ^[a-z][a-z0-9_-]{0,31}$ ]]; then
             break

@@ -163,10 +163,13 @@ prompt_yn() {
 
 prompt_text() {
     local prompt="$1" default="$2"
+    # The prompt must go to the terminal, not stdout: callers use
+    # value=$(prompt_text ...), so anything on stdout other than the final
+    # answer would be captured into the returned value (and hidden from view).
     if [[ -n "$default" ]]; then
-        printf "  ${BOLD}${WHITE}%s${RESET} ${DIM}[%s]${RESET}: " "$prompt" "$default"
+        printf "  ${BOLD}${WHITE}%s${RESET} ${DIM}[%s]${RESET}: " "$prompt" "$default" > /dev/tty
     else
-        printf "  ${BOLD}${WHITE}%s${RESET}: " "$prompt"
+        printf "  ${BOLD}${WHITE}%s${RESET}: " "$prompt" > /dev/tty
     fi
     read -r answer < /dev/tty
     echo "${answer:-$default}"
@@ -219,7 +222,7 @@ run_in_ubuntu() {
 run_in_ubuntu_user() {
     local username
     username=$(load_profile "USERNAME")
-    username="${username:-nux}"
+    username="${username:-nuxdroid}"
     proot-distro login "$NUX_DISTRO" --user "$username" -- "$@"
 }
 
