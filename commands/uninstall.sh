@@ -41,7 +41,7 @@ main() {
     # Double confirmation
     echo -e "  ${RED}Type 'UNINSTALL' to confirm:${RESET}"
     printf "  ${BOLD}▸${RESET} "
-    read -r confirm
+    read -r confirm < /dev/tty
     if [[ "$confirm" != "UNINSTALL" ]]; then
         info "Uninstall cancelled."
         return

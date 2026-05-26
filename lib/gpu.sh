@@ -32,24 +32,50 @@ get_driver_short() {
     esac
 }
 
+# Install only the packages that actually exist in the enabled repos.
+# GPU package names vary across Termux mirrors/repos, so we filter to what's
+# available rather than passing a fixed list that aborts the whole command
+# with "Unable to locate package" when one name is missing.
+install_available_pkgs() {
+    local label="$1"; shift
+    local available=()
+    local pkg
+    for pkg in "$@"; do
+        if apt-cache show "$pkg" >/dev/null 2>&1; then
+            available+=("$pkg")
+        fi
+    done
+
+    if [[ ${#available[@]} -eq 0 ]]; then
+        warn "No GPU packages for this tier are available in your repos — will fall back if needed."
+        return 0
+    fi
+
+    if ! run_with_spinner "$label" pkg install -y "${available[@]}"; then
+        warn "Some GPU packages failed to install — will fall back if needed. See $NUX_LOG."
+    fi
+}
+
 # Install GPU dependencies in Termux
 install_gpu_packages() {
     local tier="$1"
 
     case "$tier" in
         1)
-            # Turnip + Zink: needs mesa-vulkan-icd-freedreno-dri3 and virglrenderer
-            if ! run_with_spinner "Installing Turnip/Zink packages" \
-                pkg install -y mesa-vulkan-icd-freedreno-dri3 virglrenderer-mesa-zink; then
-                warn "GPU packages failed — will fall back to software rendering. See $NUX_LOG."
-            fi
+            # Turnip + Zink (Adreno). Package names differ by repo, so install
+            # whichever of these actually exist; missing ones are skipped.
+            install_available_pkgs "Installing Turnip/Zink packages" \
+                mesa-vulkan-icd-freedreno \
+                mesa-vulkan-icd-freedreno-dri3 \
+                virglrenderer-mesa-zink \
+                virglrenderer-android \
+                vulkan-loader-android \
+                vulkan-tools
             ;;
         2)
-            # VirGL
-            if ! run_with_spinner "Installing VirGL packages" \
-                pkg install -y virglrenderer-android; then
-                warn "GPU packages failed — will fall back to software rendering. See $NUX_LOG."
-            fi
+            # VirGL — universal hardware acceleration.
+            install_available_pkgs "Installing VirGL packages" \
+                virglrenderer-android
             ;;
         3)
             # Software rendering — no extra packages needed
@@ -160,7 +186,7 @@ setup_gpu() {
         echo ""
         while true; do
             printf "  ${BOLD}▸${RESET} "
-            read -r choice
+            read -r choice < /dev/tty
             if [[ "$choice" =~ ^[1-3]$ ]]; then
                 tier="$choice"
                 driver_name=$(get_driver_name "$tier")

@@ -94,7 +94,7 @@ show_app_picker() {
     echo ""
     echo -e "  ${DIM}Enter numbers separated by spaces (e.g. 1 2 4):${RESET}"
     printf "  ${BOLD}▸${RESET} "
-    read -r cat_choices
+    read -r cat_choices < /dev/tty
 
     if [[ "$cat_choices" == "0" || -z "$cat_choices" ]]; then
         info "Skipping optional apps. Only core apps will be installed."
@@ -137,7 +137,7 @@ show_app_picker() {
         echo ""
         echo -e "  ${DIM}Enter numbers separated by spaces, 'a' for all, or 0 to skip:${RESET}"
         printf "  ${BOLD}▸${RESET} "
-        read -r app_choices
+        read -r app_choices < /dev/tty
 
         if [[ "$app_choices" == "0" ]]; then
             continue

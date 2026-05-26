@@ -33,7 +33,7 @@ main() {
 
                 echo ""
                 printf "  ${BOLD}Select backup (or enter a file path):${RESET} "
-                read -r choice
+                read -r choice < /dev/tty
 
                 if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#backup_list[@]})); then
                     archive="${backup_list[$((choice-1))]}"
@@ -44,11 +44,11 @@ main() {
                 echo -e "  ${DIM}No backups found in ${NUX_BACKUP_DIR}${RESET}"
                 echo ""
                 printf "  ${BOLD}Enter path to backup archive:${RESET} "
-                read -r archive
+                read -r archive < /dev/tty
             fi
         else
             printf "  ${BOLD}Enter path to backup archive:${RESET} "
-            read -r archive
+            read -r archive < /dev/tty
         fi
     fi
 

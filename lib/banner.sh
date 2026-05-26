@@ -31,7 +31,7 @@ show_welcome() {
     separator
     echo ""
     echo -e "  ${DIM}Press Enter to begin setup...${RESET}"
-    read -r
+    read -r < /dev/tty
 }
 
 show_completion() {

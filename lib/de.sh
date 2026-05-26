@@ -29,7 +29,7 @@ setup_desktop_environment() {
 
     while true; do
         printf "  ${BOLD}▸${RESET} "
-        read -r de_choice
+        read -r de_choice < /dev/tty
         de_choice="${de_choice:-1}"
         case "$de_choice" in
             1) de_name="XFCE4";      de_pkg="xfce4 xfce4-goodies xfce4-terminal";  de_session="startxfce4"; break ;;

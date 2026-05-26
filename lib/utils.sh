@@ -143,7 +143,7 @@ prompt_choice() {
     echo ""
     while true; do
         printf "  ${BOLD}▸${RESET} "
-        read -r choice
+        read -r choice < /dev/tty
         if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#options[@]})); then
             return $((choice - 1))
         fi
@@ -156,7 +156,7 @@ prompt_yn() {
     local hint="[Y/n]"
     [[ "$default" == "n" ]] && hint="[y/N]"
     printf "  ${BOLD}${WHITE}%s${RESET} ${DIM}%s${RESET} " "$prompt" "$hint"
-    read -r answer
+    read -r answer < /dev/tty
     answer="${answer:-$default}"
     [[ "${answer,,}" == "y" ]]
 }
@@ -168,7 +168,7 @@ prompt_text() {
     else
         printf "  ${BOLD}${WHITE}%s${RESET}: " "$prompt"
     fi
-    read -r answer
+    read -r answer < /dev/tty
     echo "${answer:-$default}"
 }
 
