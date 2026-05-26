@@ -47,6 +47,10 @@ get_apps_by_category() {
         category=$(echo "$entry" | cut -d'|' -f5)
         [[ "$category" == "$cat_id" ]] && echo "$entry"
     done
+    # The loop's last `[[..]] && echo` returns 1 when the final registry entry
+    # doesn't match $cat_id, which would trip the install's `set -e` ERR trap at
+    # every call site. This is a query helper — a no-match is not an error.
+    return 0
 }
 
 show_app_picker() {

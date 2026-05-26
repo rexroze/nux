@@ -77,7 +77,9 @@ progress_bar() {
     for ((i=0; i<empty; i++)); do bar+="░"; done
     bar+="${RESET}"
     printf "\r  %s ${WHITE}%3d%%${RESET} %s" "$bar" "$pct" "$label"
-    [[ "$current" -eq "$total" ]] && echo ""
+    # `[[..]] && echo` would return 1 (and trip `set -e`) on every call that
+    # isn't at 100%; use an `if` so the function always returns 0.
+    if [[ "$current" -eq "$total" ]]; then echo ""; fi
 }
 
 # ── Spinner ──
@@ -123,7 +125,10 @@ save_profile() {
 
 load_profile() {
     local key="$1"
-    grep "^${key}=" "$NUX_PROFILE" 2>/dev/null | cut -d'=' -f2-
+    # Under `pipefail` a missing key makes grep (and thus the pipeline) exit
+    # non-zero; callers use `x=$(load_profile KEY)` and supply their own
+    # defaults, so an absent key must be empty-output + exit 0, not a failure.
+    grep "^${key}=" "$NUX_PROFILE" 2>/dev/null | cut -d'=' -f2- || true
 }
 
 load_all_profile() {

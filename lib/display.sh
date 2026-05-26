@@ -5,7 +5,10 @@ detect_display() {
     local resolution density width height dpi
 
     # Get display size from Android
-    resolution=$(wm size 2>/dev/null | grep -oP 'Override size: \K.*' || wm size 2>/dev/null | grep -oP 'Physical size: \K.*')
+    # Trailing `|| true`: when neither pattern matches, the `$( )` would exit
+    # non-zero and the assignment would trip `set -e`. The `[[ -z ]]` below
+    # already supplies a default for the empty case.
+    resolution=$(wm size 2>/dev/null | grep -oP 'Override size: \K.*' || wm size 2>/dev/null | grep -oP 'Physical size: \K.*' || true)
     if [[ -z "$resolution" ]]; then
         resolution="1920x1080"
         warn "Could not detect display resolution. Using default: ${resolution}"
@@ -15,7 +18,7 @@ detect_display() {
     height=$(echo "$resolution" | cut -d'x' -f2)
 
     # Get display density
-    density=$(wm density 2>/dev/null | grep -oP 'Override density: \K.*' || wm density 2>/dev/null | grep -oP 'Physical density: \K.*')
+    density=$(wm density 2>/dev/null | grep -oP 'Override density: \K.*' || wm density 2>/dev/null | grep -oP 'Physical density: \K.*' || true)
     dpi="${density:-160}"
 
     save_profile "DISPLAY_WIDTH" "$width"

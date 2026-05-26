@@ -49,7 +49,9 @@ detect_ram_mb() {
 }
 
 detect_storage_mb() {
-    df "$PREFIX" 2>/dev/null | awk 'NR==2{print int($4/1024)}'
+    # `|| echo 0`: if df fails, `pipefail` would make this exit non-zero and trip
+    # the caller's `set -e`; always emit a numeric value instead.
+    df "$PREFIX" 2>/dev/null | awk 'NR==2{print int($4/1024)}' || echo 0
 }
 
 detect_android_version() {
