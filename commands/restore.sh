@@ -28,7 +28,7 @@ main() {
                     fsize=$(du -sm "$f" 2>/dev/null | awk '{print $1}')
                     echo -e "    ${CYAN}${i})${RESET} ${fname} ${DIM}(${fsize}MB)${RESET}"
                     backup_list+=("$f")
-                    ((i++))
+                    i=$((i + 1))
                 done <<< "$backups"
 
                 echo ""

@@ -81,7 +81,9 @@ show_app_picker() {
         local app_count=0 cat_size=0
         while IFS= read -r entry; do
             [[ -z "$entry" ]] && continue
-            ((app_count++))
+            # Plain ((x++)) returns exit 1 when x is 0, which trips the install
+            # ERR trap under `set -e`. Use the assignment form (always exit 0).
+            app_count=$((app_count + 1))
             cat_size=$((cat_size + $(echo "$entry" | cut -d'|' -f4)))
         done <<< "$(get_apps_by_category "$cat_id")"
 
@@ -129,7 +131,7 @@ show_app_picker() {
             name=$(echo "$entry" | cut -d'|' -f2)
             size_mb=$(echo "$entry" | cut -d'|' -f4)
             printf "    ${CYAN}%d)${RESET} %-35s ${DIM}~%dMB${RESET}\n" "$idx" "$name" "$size_mb"
-            ((idx++))
+            idx=$((idx + 1))
         done <<< "$(get_apps_by_category "$cat_id")"
 
         echo ""

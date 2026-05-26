@@ -88,7 +88,7 @@ spinner() {
     while kill -0 "$pid" 2>/dev/null; do
         printf "\r  ${CYAN}%s${RESET} ${WHITE}%s${RESET}" "${frames[$((i % ${#frames[@]}))]}" "$label"
         sleep 0.1
-        ((i++))
+        i=$((i + 1))
     done
     printf "\r  ${GREEN}✔${RESET} ${WHITE}%s${RESET}\n" "$label"
 }

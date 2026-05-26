@@ -81,19 +81,44 @@ install_available_pkgs() {
     fi
 }
 
+# mesa-zink and virglrenderer-mesa-zink ship in the Termux User Repository
+# (TUR), not the main repo, so apt-cache can't see them until tur-repo is added.
+# Pull it in once before installing the Tier-1 Zink packages. Idempotent: if the
+# package is already visible the repo is set up and we return early.
+ensure_tur_repo() {
+    if apt-cache show virglrenderer-mesa-zink >/dev/null 2>&1; then
+        return 0
+    fi
+
+    info "Adding Termux User Repository (TUR) for Zink packages..."
+    { echo ""; echo "\$ pkg install -y tur-repo && apt-get update"; } >> "$NUX_LOG"
+    if pkg install -y tur-repo >> "$NUX_LOG" 2>&1 \
+        && apt-get update >> "$NUX_LOG" 2>&1; then
+        success "TUR repository added."
+    else
+        warn "Could not add TUR repository — Zink packages may be skipped."
+        warn "See the log for the exact error: $NUX_LOG"
+    fi
+}
+
 # Install GPU dependencies in Termux
 install_gpu_packages() {
     local tier="$1"
 
     case "$tier" in
         1)
-            # Turnip + Zink (Adreno). Package names differ by repo, so install
-            # whichever of these actually exist; missing ones are skipped.
-            # vulkan-tools pulls in the real vulkan-loader as a dependency, so
-            # the obsolete vulkan-loader-android name is intentionally omitted.
+            # Turnip + Zink (Adreno). mesa-zink + virglrenderer-mesa-zink come
+            # from TUR, so add that repo first; the freedreno ICD, virglrenderer
+            # and vulkan-tools come from the main repo. vulkan-tools pulls in the
+            # real vulkan-loader as a dependency, so the obsolete
+            # vulkan-loader-android name is intentionally omitted. Package names
+            # differ by repo, so install whichever actually exist; missing ones
+            # are skipped.
+            ensure_tur_repo
             install_available_pkgs "Installing Turnip/Zink packages" \
                 mesa-vulkan-icd-freedreno \
                 mesa-vulkan-icd-freedreno-dri3 \
+                mesa-zink \
                 virglrenderer-mesa-zink \
                 virglrenderer-android \
                 vulkan-tools
