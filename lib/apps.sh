@@ -232,10 +232,10 @@ show_confirmation() {
 }
 
 install_core_apps() {
-    run_in_ubuntu bash -c "
+    run_logged "Installing Firefox" run_in_ubuntu bash -c "
         export DEBIAN_FRONTEND=noninteractive
-        apt-get install -y --no-install-recommends firefox-esr 2>/dev/null
-    " 2>/dev/null
+        apt-get install -y --no-install-recommends firefox-esr
+    "
     success "Firefox installed."
 }
 
@@ -255,20 +255,29 @@ install_selected_apps() {
             ecat=$(echo "$entry" | cut -d'|' -f5)
 
             if [[ "$eid" == "$app_id" ]]; then
-                # Special handling for code-server
+                # Optional apps are non-fatal: a single failure warns and moves on.
                 if [[ "$eid" == "vscode" ]]; then
+                    # Special handling for code-server
                     info "Installing VS Code (code-server)..."
-                    run_in_ubuntu bash -c "
+                    { echo ""; echo "\$ install code-server"; } >> "$NUX_LOG"
+                    if run_in_ubuntu bash -c "
                         export DEBIAN_FRONTEND=noninteractive
-                        apt-get install -y curl 2>/dev/null
-                        curl -fsSL https://code-server.dev/install.sh | sh 2>/dev/null
-                    " 2>/dev/null
+                        apt-get install -y curl
+                        curl -fsSL https://code-server.dev/install.sh | sh
+                    " >> "$NUX_LOG" 2>&1; then
+                        success "${ename} installed."
+                    else
+                        warn "${ename} failed to install — skipping. See $NUX_LOG."
+                    fi
                 else
-                    run_with_spinner "Installing ${ename}" \
-                        proot-distro login "$NUX_DISTRO" -- bash -c \
-                        "export DEBIAN_FRONTEND=noninteractive; apt-get install -y --no-install-recommends ${epkg} 2>/dev/null"
+                    if run_with_spinner "Installing ${ename}" \
+                        run_in_ubuntu bash -c \
+                        "export DEBIAN_FRONTEND=noninteractive; apt-get install -y --no-install-recommends ${epkg}"; then
+                        success "${ename} installed."
+                    else
+                        warn "${ename} failed to install — skipping. See $NUX_LOG."
+                    fi
                 fi
-                success "${ename} installed."
             fi
         done
     done

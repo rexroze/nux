@@ -26,20 +26,17 @@ configure_locale_in_ubuntu() {
     lang="${lang:-en_US.UTF-8}"
     timezone="${timezone:-UTC}"
 
+    { echo ""; echo "\$ configure locale ${lang} / timezone ${timezone}"; } >> "$NUX_LOG"
     run_in_ubuntu bash -c "
         # Set timezone
-        ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime 2>/dev/null
-        echo '${timezone}' > /etc/timezone 2>/dev/null
+        ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime
+        echo '${timezone}' > /etc/timezone
 
         # Generate locale
-        sed -i 's/# ${lang}/${lang}/' /etc/locale.gen 2>/dev/null
-        locale-gen 2>/dev/null
-        echo 'LANG=${lang}' > /etc/default/locale 2>/dev/null
-
-        # Export
-        export LANG=${lang}
-        export TZ=${timezone}
-    " 2>/dev/null
+        sed -i 's/# ${lang}/${lang}/' /etc/locale.gen
+        locale-gen
+        echo 'LANG=${lang}' > /etc/default/locale
+    " >> "$NUX_LOG" 2>&1 || warn "Locale setup had issues (continuing). See $NUX_LOG."
 
     success "Locale: ${lang} | Timezone: ${timezone}"
 }

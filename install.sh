@@ -4,12 +4,13 @@
 #  curl -sL https://raw.githubusercontent.com/rexroze/nux/main/install.sh | bash
 # ─────────────────────────────────────────────────────────────
 
-set -e
+set -Eeo pipefail
 
 NUX_VERSION="1.0"
 NUX_REPO="https://raw.githubusercontent.com/rexroze/nux/main"
 NUX_INSTALL_DIR="$PREFIX/share/nux"
 NUX_DIR="$HOME/.nux"
+NUX_LOG="$NUX_DIR/install.log"
 
 # ── Minimal bootstrap colors ──
 RED='\033[1;31m'
@@ -25,6 +26,43 @@ die() { echo -e "${RED}  ✖ $*${RESET}"; exit 1; }
 info() { echo -e "${CYAN}  ℹ ${WHITE}$*${RESET}"; }
 success() { echo -e "${GREEN}  ✔ ${WHITE}$*${RESET}"; }
 warn() { echo -e "${YELLOW}  ⚠ ${WHITE}$*${RESET}"; }
+
+# ── Logging ──
+# Everything that does real work writes its output to $NUX_LOG so that a
+# failure can be explained instead of silently aborting the script.
+
+log_init() {
+    mkdir -p "$(dirname "$NUX_LOG")"
+    echo "=== Nux install — $(date) ===" > "$NUX_LOG"
+}
+
+# Print a clear failure message, the tail of the log, and where to find it.
+report_failure() {
+    echo ""
+    echo -e "${RED}  ✖ ${WHITE}Failed: $1${RESET}"
+    if [[ -s "$NUX_LOG" ]]; then
+        echo -e "${DIM}  ── last lines of the log ──${RESET}"
+        tail -n 20 "$NUX_LOG" | sed 's/^/    /'
+        echo ""
+        echo -e "${YELLOW}  Full log:${RESET} ${WHITE}$NUX_LOG${RESET}"
+        echo -e "${DIM}  Share this log when reporting the problem.${RESET}"
+    fi
+    exit 1
+}
+
+# Run a command, capturing all output to the log; report on non-zero exit.
+run_logged() {
+    local desc="$1"; shift
+    { echo ""; echo "\$ $*"; } >> "$NUX_LOG"
+    if ! "$@" >> "$NUX_LOG" 2>&1; then
+        report_failure "$desc"
+    fi
+}
+
+# Safety net: catch any unwrapped command that trips `set -e`.
+trap 'report_failure "command on line $LINENO"' ERR
+
+log_init
 
 # ── Pre-flight checks ──
 
@@ -53,8 +91,8 @@ echo ""
 
 # 2. Update Termux packages
 info "Updating Termux packages..."
-pkg update -y -o Dpkg::Options::="--force-confnew" > /dev/null 2>&1
-pkg upgrade -y -o Dpkg::Options::="--force-confnew" > /dev/null 2>&1
+run_logged "Updating Termux packages" pkg update -y -o Dpkg::Options::="--force-confnew"
+run_logged "Upgrading Termux packages" pkg upgrade -y -o Dpkg::Options::="--force-confnew"
 success "Termux packages updated."
 
 # 3. Setup storage
@@ -89,14 +127,15 @@ echo ""
 
 # ── Install dependencies ──
 info "Installing core dependencies..."
-pkg install -y \
-    proot-distro \
-    termux-x11-nightly \
-    pulseaudio \
-    wget \
-    git \
-    curl \
-    > /dev/null 2>&1
+
+# termux-x11-nightly lives in the x11-repo, which must be enabled first.
+run_logged "Enabling X11 package repository" pkg install -y x11-repo
+run_logged "Refreshing package lists" pkg update -y -o Dpkg::Options::="--force-confnew"
+
+# Install each dependency on its own so a failure names the exact package.
+for dep in proot-distro termux-x11-nightly pulseaudio wget git curl; do
+    run_logged "Installing $dep" pkg install -y "$dep"
+done
 success "Dependencies installed."
 
 # ── Download Nux scripts ──
@@ -105,9 +144,22 @@ info "Downloading Nux..."
 mkdir -p "$NUX_INSTALL_DIR"/{lib,commands,assets}
 mkdir -p "$NUX_DIR"
 
+# Download one file, retrying once. -f makes curl fail on HTTP errors (e.g. 404)
+# instead of silently writing the error page; we also verify the file is non-empty
+# so a bad download is caught here rather than later as a confusing `source:` error.
 download_file() {
     local path="$1"
-    curl -sL "${NUX_REPO}/${path}" -o "${NUX_INSTALL_DIR}/${path}" 2>/dev/null
+    local url="${NUX_REPO}/${path}"
+    local dest="${NUX_INSTALL_DIR}/${path}"
+    local attempt
+    for attempt in 1 2; do
+        { echo ""; echo "\$ curl -fsSL $url"; } >> "$NUX_LOG"
+        if curl -fsSL "$url" -o "$dest" >> "$NUX_LOG" 2>&1 && [[ -s "$dest" ]]; then
+            return 0
+        fi
+        sleep 1
+    done
+    report_failure "Downloading ${path} (${url})"
 }
 
 # Download all library files
@@ -223,9 +275,14 @@ echo ""
 # Install Ubuntu via proot-distro
 if ! proot-distro list 2>/dev/null | grep -q "$NUX_DISTRO"; then
     info "Installing Ubuntu via proot-distro..."
-    proot-distro install "$NUX_DISTRO" 2>&1 | while IFS= read -r line; do
+    { echo ""; echo "\$ proot-distro install $NUX_DISTRO"; } >> "$NUX_LOG"
+    set +e
+    proot-distro install "$NUX_DISTRO" 2>&1 | tee -a "$NUX_LOG" | while IFS= read -r line; do
         printf "\r  ${DIM}%s${RESET}%*s" "$(echo "$line" | head -c 55)" 25 ""
     done
+    rc=${PIPESTATUS[0]}
+    set -e
+    [[ "$rc" -eq 0 ]] || report_failure "Installing Ubuntu via proot-distro"
     echo ""
     success "Ubuntu installed."
 else
@@ -234,9 +291,9 @@ fi
 
 # Base system setup inside Ubuntu
 info "Setting up base system..."
-run_in_ubuntu bash -c "
+run_logged "Installing base system packages" run_in_ubuntu bash -c "
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq 2>/dev/null
+    apt-get update -qq
     apt-get install -y --no-install-recommends \
         sudo \
         nano \
@@ -244,19 +301,18 @@ run_in_ubuntu bash -c "
         curl \
         ca-certificates \
         locales \
-        dbus-x11 \
-        2>/dev/null
-" 2>/dev/null
+        dbus-x11
+"
 success "Base system configured."
 
 # Setup username inside Ubuntu
 info "Creating user account..."
 username=$(load_profile "USERNAME")
 username="${username:-nux}"
-run_in_ubuntu bash -c "
+run_logged "Creating user account '${username}'" run_in_ubuntu bash -c "
     if ! id '${username}' &>/dev/null; then
-        useradd -m -s /bin/bash '${username}' 2>/dev/null
-        echo '${username} ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers 2>/dev/null
+        useradd -m -s /bin/bash '${username}'
+        echo '${username} ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
         cat > /home/${username}/.bashrc << 'BASHEOF'
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export TERM=xterm-256color
@@ -267,7 +323,7 @@ alias grep='grep --color=auto'
 BASHEOF
         chown -R '${username}:${username}' /home/${username}
     fi
-" 2>/dev/null
+"
 success "User '${username}' created."
 
 # Configure locale and timezone

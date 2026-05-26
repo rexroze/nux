@@ -2,8 +2,9 @@
 # Nux Droid — Audio (PulseAudio)
 
 install_audio() {
-    run_with_spinner "Installing PulseAudio" \
-        pkg install -y pulseaudio 2>/dev/null
+    if ! run_with_spinner "Installing PulseAudio" pkg install -y pulseaudio; then
+        warn "PulseAudio failed to install — audio may not work. See $NUX_LOG."
+    fi
 }
 
 configure_audio() {

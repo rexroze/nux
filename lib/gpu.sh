@@ -39,13 +39,17 @@ install_gpu_packages() {
     case "$tier" in
         1)
             # Turnip + Zink: needs mesa-vulkan-icd-freedreno-dri3 and virglrenderer
-            run_with_spinner "Installing Turnip/Zink packages" \
-                pkg install -y mesa-vulkan-icd-freedreno-dri3 virglrenderer-mesa-zink 2>/dev/null
+            if ! run_with_spinner "Installing Turnip/Zink packages" \
+                pkg install -y mesa-vulkan-icd-freedreno-dri3 virglrenderer-mesa-zink; then
+                warn "GPU packages failed — will fall back to software rendering. See $NUX_LOG."
+            fi
             ;;
         2)
             # VirGL
-            run_with_spinner "Installing VirGL packages" \
-                pkg install -y virglrenderer-android 2>/dev/null
+            if ! run_with_spinner "Installing VirGL packages" \
+                pkg install -y virglrenderer-android; then
+                warn "GPU packages failed — will fall back to software rendering. See $NUX_LOG."
+            fi
             ;;
         3)
             # Software rendering — no extra packages needed

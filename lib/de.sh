@@ -50,23 +50,28 @@ setup_desktop_environment() {
 }
 
 install_desktop_environment() {
-    local de_name de_pkg
+    local de_name de_pkg rc
     de_name=$(load_profile "DE")
     de_pkg=$(load_profile "DE_PKG")
 
     info "Installing ${de_name}... This may take several minutes."
     echo ""
 
+    { echo ""; echo "\$ apt-get install ${de_pkg} dbus-x11"; } >> "$NUX_LOG"
+    set +e
     run_in_ubuntu bash -c "
         export DEBIAN_FRONTEND=noninteractive
-        apt-get update -qq 2>/dev/null
-        apt-get install -y --no-install-recommends ${de_pkg} dbus-x11 2>/dev/null
-    " 2>&1 | while IFS= read -r line; do
+        apt-get update -qq
+        apt-get install -y --no-install-recommends ${de_pkg} dbus-x11
+    " 2>&1 | tee -a "$NUX_LOG" | while IFS= read -r line; do
         # Parse apt progress and show a simplified output
         if echo "$line" | grep -qP '^\w'; then
             printf "\r  ${DIM}%s${RESET}%*s" "$(echo "$line" | head -c 60)" 20 ""
         fi
     done
+    rc=${PIPESTATUS[0]}
+    set -e
+    [[ "$rc" -eq 0 ]] || report_failure "Installing ${de_name} desktop"
 
     echo ""
     success "${de_name} installed."

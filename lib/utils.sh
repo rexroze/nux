@@ -10,6 +10,7 @@ NUX_PROOT_DIR="$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu"
 NUX_BACKUP_DIR="/sdcard/Nux/backups"
 NUX_REPO="https://raw.githubusercontent.com/rexroze/nux/main"
 NUX_RELEASE_API="https://api.github.com/repos/rexroze/nux/releases/latest"
+NUX_LOG="$NUX_DIR/install.log"
 
 # ── Colors ──
 RED='\033[1;31m'
@@ -30,6 +31,30 @@ success() { echo -e "${GREEN}  ✔ ${WHITE}$*${RESET}"; }
 warn()    { echo -e "${YELLOW}  ⚠ ${WHITE}$*${RESET}"; }
 error()   { echo -e "${RED}  ✖ ${WHITE}$*${RESET}"; }
 die()     { error "$*"; exit 1; }
+
+# ── Logging ──
+# Real work writes its output to $NUX_LOG so a failure can be explained.
+# report_failure / run_logged mirror the bootstrap copies in install.sh.
+report_failure() {
+    echo ""
+    error "Failed: $1"
+    if [[ -s "$NUX_LOG" ]]; then
+        echo -e "${DIM}  ── last lines of the log ──${RESET}"
+        tail -n 20 "$NUX_LOG" | sed 's/^/    /'
+        echo ""
+        echo -e "${YELLOW}  Full log:${RESET} ${WHITE}$NUX_LOG${RESET}"
+        echo -e "${DIM}  Share this log when reporting the problem.${RESET}"
+    fi
+    exit 1
+}
+
+run_logged() {
+    local desc="$1"; shift
+    { echo ""; echo "\$ $*"; } >> "$NUX_LOG"
+    if ! "$@" >> "$NUX_LOG" 2>&1; then
+        report_failure "$desc"
+    fi
+}
 
 # Stage header: [1/8] Installing Ubuntu...
 stage() {
@@ -68,13 +93,17 @@ spinner() {
     printf "\r  ${GREEN}✔${RESET} ${WHITE}%s${RESET}\n" "$label"
 }
 
-# Run a command silently with a spinner
+# Run a command with a spinner, sending its output to the log.
+# Returns the wrapped command's exit code so callers can react to failure.
 run_with_spinner() {
     local label="$1"; shift
-    "$@" > /dev/null 2>&1 &
-    spinner $! "$label"
-    wait $! 2>/dev/null
-    return $?
+    { echo ""; echo "\$ $*"; } >> "$NUX_LOG"
+    "$@" >> "$NUX_LOG" 2>&1 &
+    local pid=$!
+    spinner "$pid" "$label"
+    local rc=0
+    wait "$pid" || rc=$?
+    return "$rc"
 }
 
 # ── Profile helpers ──
