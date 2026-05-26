@@ -22,24 +22,10 @@ setup_username() {
 
     save_profile "USERNAME" "$username"
 
-    # Create user inside Ubuntu proot
-    run_in_ubuntu bash -c "
-        if ! id '${username}' &>/dev/null; then
-            useradd -m -s /bin/bash '${username}' 2>/dev/null
-            echo '${username} ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers 2>/dev/null
-
-            # Set up basic shell config
-            cat > /home/${username}/.bashrc << 'BASHEOF'
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-export TERM=xterm-256color
-export PULSE_SERVER=127.0.0.1
-alias ls='ls --color=auto'
-alias ll='ls -la'
-alias grep='grep --color=auto'
-BASHEOF
-            chown -R '${username}:${username}' /home/${username}
-        fi
-    " 2>/dev/null
+    # NOTE: the Linux account is created later by install.sh, once the Ubuntu
+    # rootfs actually exists. Creating it here would run `proot-distro login`
+    # against a distro that isn't installed yet (onboarding is step 4; Ubuntu
+    # is installed at step 8) and abort the installer.
 
     success "Username set: ${username}"
     echo ""

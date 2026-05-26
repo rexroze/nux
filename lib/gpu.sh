@@ -89,12 +89,13 @@ install_gpu_packages() {
         1)
             # Turnip + Zink (Adreno). Package names differ by repo, so install
             # whichever of these actually exist; missing ones are skipped.
+            # vulkan-tools pulls in the real vulkan-loader as a dependency, so
+            # the obsolete vulkan-loader-android name is intentionally omitted.
             install_available_pkgs "Installing Turnip/Zink packages" \
                 mesa-vulkan-icd-freedreno \
                 mesa-vulkan-icd-freedreno-dri3 \
                 virglrenderer-mesa-zink \
                 virglrenderer-android \
-                vulkan-loader-android \
                 vulkan-tools
             ;;
         2)
