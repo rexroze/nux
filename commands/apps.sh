@@ -5,6 +5,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$SCRIPT_DIR/lib/utils.sh"
 source "$SCRIPT_DIR/lib/apps.sh"
+source "$SCRIPT_DIR/lib/de.sh"
 
 main() {
     clear_screen
@@ -23,6 +24,10 @@ BANNER
 
     show_app_picker "true"
     install_selected_apps
+
+    # Re-assert the panel layout / caches so the new apps can't break the
+    # desktop the way installing apps otherwise can (see lib/de.sh).
+    repair_xfce_desktop full
 
     echo ""
     success "All selected apps have been installed."

@@ -7,6 +7,7 @@ source "$SCRIPT_DIR/lib/utils.sh"
 source "$SCRIPT_DIR/lib/gpu.sh"
 source "$SCRIPT_DIR/lib/audio.sh"
 source "$SCRIPT_DIR/lib/display.sh"
+source "$SCRIPT_DIR/lib/de.sh"
 
 load_all_profile
 
@@ -66,7 +67,11 @@ main() {
     export DISPLAY=:0
     success "Display server ready."
 
-    # 7. Launch proot Ubuntu with DE
+    # 7. Make sure the desktop has a valid panel layout before launching
+    #    (deploys defaults only if missing, so user tweaks survive).
+    repair_xfce_desktop ensure
+
+    # 8. Launch proot Ubuntu with DE
     info "Launching ${de_session}..."
     echo ""
 

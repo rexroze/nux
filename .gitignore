@@ -1,0 +1,11 @@
+# Internal dev guidance — not shipped to the public repo
+CLAUDE.md
+
+# Logs
+*.log
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~

@@ -1,0 +1,7 @@
+# These scripts run on Termux/Linux. They MUST keep LF line endings — a CRLF
+# (\r) sneaking in breaks the shebang ("bad interpreter: .../bash^M") and the
+# `curl | bash` installer. Force LF for everything regardless of contributor OS.
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.xml   text eol=lf

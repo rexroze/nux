@@ -31,6 +31,7 @@ main() {
             "commands/start.sh" "commands/stop.sh" "commands/apps.sh"
             "commands/backup.sh" "commands/restore.sh" "commands/update.sh"
             "commands/uninstall.sh"
+            "assets/xfce4/xfce4-panel.xml"
             "install.sh"
         )
 

@@ -4,6 +4,10 @@
 
 NUX_VERSION="1.0"
 NUX_DIR="$HOME/.nux"
+# Where the Nux scripts + bundled assets are installed ($PREFIX/share/nux).
+# Resolved from this file's own location so it is correct whether sourced by
+# install.sh or by a command in $PREFIX/share/nux/commands.
+NUX_SHARE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || NUX_SHARE_DIR=""
 NUX_PROFILE="$NUX_DIR/profile"
 NUX_DISTRO="ubuntu"
 NUX_PROOT_DIR="$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu"
@@ -51,7 +55,15 @@ report_failure() {
 run_logged() {
     local desc="$1"; shift
     { echo ""; echo "\$ $*"; } >> "$NUX_LOG"
-    if ! "$@" >> "$NUX_LOG" 2>&1; then
+    # Run in the background so the spinner can animate while it works. We poll
+    # with the spinner (kill -0, never `wait`) so the status is still available
+    # to the `wait` below — that is what tells success from failure.
+    "$@" >> "$NUX_LOG" 2>&1 &
+    local pid=$!
+    spinner "$pid" "$desc"
+    if wait "$pid"; then
+        success "$desc"
+    else
         report_failure "$desc"
     fi
 }
@@ -83,20 +95,40 @@ progress_bar() {
 }
 
 # ── Spinner ──
+# Animates next to $label while process $pid runs, then clears its own line —
+# the caller (run_logged / run_with_spinner) prints the final ✔/✖ once it knows
+# the exit code. Polls with `kill -0` (never `wait`) so the caller can still
+# reap the real status. Degrades gracefully off a TTY and without UTF-8.
 spinner() {
     local pid="$1" label="$2"
-    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+
+    # Not a terminal (piped, redirected, captured to a log): no animation —
+    # print one static line and wait quietly so output stays readable.
+    if [[ ! -t 1 ]]; then
+        printf "  %s ...\n" "$label"
+        while kill -0 "$pid" 2>/dev/null; do sleep 0.3; done
+        return
+    fi
+
+    local frames
+    if [[ "${LC_ALL:-}${LC_CTYPE:-}${LANG:-}" == *[Uu][Tt][Ff]* ]]; then
+        frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    else
+        frames=('-' '\' '|' '/')   # ASCII fallback when the font lacks braille
+    fi
+
     local i=0
     while kill -0 "$pid" 2>/dev/null; do
         printf "\r  ${CYAN}%s${RESET} ${WHITE}%s${RESET}" "${frames[$((i % ${#frames[@]}))]}" "$label"
         sleep 0.1
         i=$((i + 1))
     done
-    printf "\r  ${GREEN}✔${RESET} ${WHITE}%s${RESET}\n" "$label"
+    printf "\r\033[K"   # clear the spinner line; caller prints the result
 }
 
-# Run a command with a spinner, sending its output to the log.
-# Returns the wrapped command's exit code so callers can react to failure.
+# Run a command with a spinner, sending its output to the log. The spinner only
+# animates; this returns the wrapped command's exit code and prints nothing, so
+# callers decide whether to report success() or warn() (used for optional steps).
 run_with_spinner() {
     local label="$1"; shift
     { echo ""; echo "\$ $*"; } >> "$NUX_LOG"

@@ -50,11 +50,43 @@ report_failure() {
     exit 1
 }
 
+# Bootstrap spinner — mirrors lib/utils.sh:spinner(). Needed here because the
+# Termux-dependency phase runs before utils.sh has been downloaded. Animates
+# next to $label, clears its line on exit; degrades off a TTY / without UTF-8.
+spinner() {
+    local pid="$1" label="$2"
+    if [[ ! -t 1 ]]; then
+        printf "  %s ...\n" "$label"
+        while kill -0 "$pid" 2>/dev/null; do sleep 0.3; done
+        return
+    fi
+    local frames
+    if [[ "${LC_ALL:-}${LC_CTYPE:-}${LANG:-}" == *[Uu][Tt][Ff]* ]]; then
+        frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    else
+        frames=('-' '\' '|' '/')
+    fi
+    local i=0
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\r  ${CYAN}%s${RESET} ${WHITE}%s${RESET}" "${frames[$((i % ${#frames[@]}))]}" "$label"
+        sleep 0.1
+        i=$((i + 1))
+    done
+    printf "\r\033[K"
+}
+
 # Run a command, capturing all output to the log; report on non-zero exit.
+# Backgrounds the work so the spinner animates while it runs (mirrors
+# lib/utils.sh:run_logged once that has loaded). Fatal on failure.
 run_logged() {
     local desc="$1"; shift
     { echo ""; echo "\$ $*"; } >> "$NUX_LOG"
-    if ! "$@" >> "$NUX_LOG" 2>&1; then
+    "$@" >> "$NUX_LOG" 2>&1 &
+    local pid=$!
+    spinner "$pid" "$desc"
+    if wait "$pid"; then
+        success "$desc"
+    else
         report_failure "$desc"
     fi
 }
@@ -152,6 +184,7 @@ download_file() {
     local url="${NUX_REPO}/${path}"
     local dest="${NUX_INSTALL_DIR}/${path}"
     local attempt
+    mkdir -p "$(dirname "$dest")"   # supports nested paths like assets/xfce4/…
     for attempt in 1 2; do
         { echo ""; echo "\$ curl -fsSL $url"; } >> "$NUX_LOG"
         if curl -fsSL "$url" -o "$dest" >> "$NUX_LOG" 2>&1 && [[ -s "$dest" ]]; then
@@ -170,6 +203,11 @@ done
 # Download all command files
 for f in start.sh stop.sh apps.sh backup.sh restore.sh update.sh uninstall.sh; do
     download_file "commands/$f"
+done
+
+# Download bundled assets (e.g. the fallback XFCE panel layout)
+for f in xfce4/xfce4-panel.xml; do
+    download_file "assets/$f"
 done
 
 # Make everything executable
@@ -274,17 +312,8 @@ echo ""
 
 # Install Ubuntu via proot-distro
 if ! proot-distro list 2>/dev/null | grep -q "$NUX_DISTRO"; then
-    info "Installing Ubuntu via proot-distro..."
-    { echo ""; echo "\$ proot-distro install $NUX_DISTRO"; } >> "$NUX_LOG"
-    set +e
-    proot-distro install "$NUX_DISTRO" 2>&1 | tee -a "$NUX_LOG" | while IFS= read -r line; do
-        printf "\r  ${DIM}%s${RESET}%*s" "$(echo "$line" | head -c 55)" 25 ""
-    done
-    rc=${PIPESTATUS[0]}
-    set -e
-    [[ "$rc" -eq 0 ]] || report_failure "Installing Ubuntu via proot-distro"
-    echo ""
-    success "Ubuntu installed."
+    info "Installing Ubuntu via proot-distro... (this can take a few minutes)"
+    run_logged "Installing Ubuntu via proot-distro" proot-distro install "$NUX_DISTRO"
 else
     success "Ubuntu already installed."
 fi
@@ -349,6 +378,10 @@ install_core_apps
 # Install selected optional apps
 info "Installing selected apps..."
 install_selected_apps
+
+# Make the XFCE desktop deterministic so the panel always renders, even after
+# the extra apps above pulled in autostart entries / menu changes (see de.sh).
+repair_xfce_desktop full
 
 # ── Step 10: Completion ──
 stage 9 9 "Finishing up..."
