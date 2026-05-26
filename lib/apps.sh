@@ -238,11 +238,30 @@ show_confirmation() {
 }
 
 install_core_apps() {
-    run_logged "Installing Firefox" run_in_ubuntu bash -c "
+    # Modern Ubuntu ships Firefox only as a snap; the firefox-esr/firefox debs
+    # are unavailable (or snap stubs) and snapd doesn't run in proot, hence
+    # "Package 'firefox-esr' has no installation candidate". Pull a real .deb
+    # from the Mozilla Team PPA, pinned above the snap transitional package.
+    # A browser failure is non-fatal — the desktop is already installed, so we
+    # warn and continue rather than aborting the whole setup.
+    info "Setting up Firefox (Mozilla Team PPA)..."
+    { echo ""; echo "\$ add mozillateam PPA + install firefox-esr"; } >> "$NUX_LOG"
+    if run_in_ubuntu bash -c '
+        set -e
         export DEBIAN_FRONTEND=noninteractive
-        apt-get install -y --no-install-recommends firefox-esr
-    "
-    success "Firefox installed."
+        apt-get install -y --no-install-recommends software-properties-common
+        add-apt-repository -y ppa:mozillateam/ppa
+        printf "Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n" \
+            > /etc/apt/preferences.d/mozilla-firefox
+        apt-get update
+        apt-get install -y --no-install-recommends firefox-esr \
+            || apt-get install -y --no-install-recommends firefox
+    ' >> "$NUX_LOG" 2>&1; then
+        success "Firefox installed."
+    else
+        warn "Firefox failed to install — skipping. The desktop is ready; you can"
+        warn "retry later with 'nux apps'. See $NUX_LOG for the apt error."
+    fi
 }
 
 install_selected_apps() {
